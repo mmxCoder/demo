@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <script>
+        const sse = new EventSource('http://localhost:3001/sse')
+
+        sse.addEventListener('hello', (data) => {
+            console.log('hello 事件', data)
+        })
+        sse.addEventListener('world', (data) => {
+            console.log('world 事件', data)
+        })
+
+        sse.addEventListener('error', (data) => {
+            console.log('cuowu1le =. ', data)
+            // sse.close()
+        })
+
+        // setTimeout(() => {
+        //     sse.close()
+        // }, 1000)
+
+    </script>
+</body>
+
+</html>

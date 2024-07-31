@@ -1,0 +1,12 @@
+{
+  "name": "demo",
+  "version": "1.0.0",
+  "description": "案例源码",
+  "main": "index.js",
+  "scripts": {
+    "push": "node ./script/push.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
