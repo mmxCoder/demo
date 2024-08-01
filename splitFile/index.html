@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <div id="upload">分片上传</div>
+    <div id="upload1">整个上传</div>
+    <script>
+
+        function ajax(options) {
+            // 默认值
+            options = options || {};
+            options.type = (options.type || 'GET').toUpperCase();
+            options.dataType = options.dataType || 'json';
+
+            // 创建xhr对象
+            var xhr = new XMLHttpRequest();
+
+            // 打开连接
+            xhr.open(options.type, options.url, true);
+
+            // 设置响应类型
+            xhr.responseType = options.dataType;
+
+            // 发送请求
+            if (options.type === 'GET') {
+                xhr.send();
+            } else if (options.type === 'POST') {
+                // xhr.setRequestHeader('Content-Type', '');
+                xhr.send(options.data);
+            }
+
+            // 处理响应
+            xhr.onload = function () {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    options.success && options.success(xhr.response);
+                } else {
+                    options.error && options.error(xhr.statusText);
+                }
+            };
+
+            // 处理错误
+            xhr.onerror = function () {
+                options.error && options.error('Network Error');
+            };
+        }
+
+
+        // 选择文件
+        function chooseFile() {
+
+            const option = {
+                multiple: false,
+                accept: '*',
+                maxSize: 2000,
+                upload: true,
+            };
+
+            return new Promise((resolve, reject) => {
+                try {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = option.accept;
+                    input.multiple = option.multiple;
+                    input.onchange = () => {
+                        const file = Array.from(input.files);
+                        input.remove()
+
+                        // 先验证文件大小
+                        for (const f of file) {
+                            const size = f.size / 1024 / 1024;
+                            if (size > option.maxSize) {
+                                console.log('文件大小不能超过' + option.maxSize + 'M');
+                                reject(false);
+                                return;
+                            }
+                        }
+
+                        resolve(file);
+                    };
+                    input.click();
+                } catch (err) {
+                    console.log(err)
+                }
+            });
+        }
+
+
+        // 处理切片
+        function sliceFile(file) {
+            const chunkSize = 1024 * 1024 * 1; // 每个部分的大小（1MB）
+            const totalChunks = Math.ceil(file.size / chunkSize); // 总部分数
+
+            let currentChunk = 1;
+            let startByte = 0;
+
+            let result = 1, time = Date.now();
+
+            while (startByte < file.size) { // 分割文件为多个部分，并上传每个部分
+                const endByte = Math.min(startByte + chunkSize, file.size);
+                const chunk = file.slice(startByte, endByte);
+
+                const formData = new FormData();
+                formData.append('file', chunk, file.name);
+                formData.append('index', currentChunk - 1);
+                formData.append('totalChunks', totalChunks);
+
+                ajax({
+                    url: 'http://localhost:3000/upload',
+                    type: 'POST',
+                    data: formData,
+                    success: (res) => {
+                        if (result++ === totalChunks) {
+                            console.log('文件已全部上传，用时: ', Date.now() - time)
+                        }
+                    }
+                })
+
+                startByte += chunkSize;
+                currentChunk++;
+            }
+        }
+
+        // 分片上传
+        function handleToUpload() {
+            chooseFile().then(([file]) => {
+                sliceFile(file)
+            })
+        }
+
+        // 整个上传
+        function handleToUploadWithNotSplit() {
+            const time = Date.now();
+            chooseFile().then(([file]) => {
+
+                const formData = new FormData()
+                formData.append('file', file)
+
+                ajax({
+                    url: 'http://localhost:3000/uploadWithNotSplit',
+                    type: 'POST',
+                    data: formData,
+                    success: (res) => {
+                        console.log('用时: ', Date.now() - time)
+                    }
+                })
+            })
+        }
+
+
+        upload.addEventListener('click', handleToUpload)
+        upload1.addEventListener('click', handleToUploadWithNotSplit)
+
+    </script>
+</body>
+
+</html>
