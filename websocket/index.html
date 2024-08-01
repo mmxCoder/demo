@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <script>
+        const ws = new WebSocket('ws://localhost:3001')
+        ws.addEventListener('message', (data) => {
+            console.log('接收到消息', data.data)
+        })
+
+        setTimeout(() => {
+            // 发送消息
+            ws.send(JSON.stringify({ name: 'MMX ' }))
+        }, 1000)
+
+    </script>
+</body>
+
+</html>
