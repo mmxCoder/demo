@@ -2,9 +2,15 @@ const express = require("express");
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
+const { promisify } = require("util");
+
+const readdir = promisify(fs.readdir);
 
 const app = express();
-const upload = multer({ dest: "uploads/" });
+
+app.use(express.json());
+
+const upload = multer();
 
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
@@ -20,39 +26,57 @@ app.use((req, res, next) => {
   next();
 });
 
-app.post("/upload", upload.single("file"), (req, res) => {
-  const { originalname, filename } = req.file;
-  const { index, totalChunks } = req.body;
+const _savaFile = () => {
+  let isExistDir = false;
 
-  const tempPath = path.join(__dirname, "uploads", filename);
-  const targetPath = path.join(__dirname, "uploads", originalname);
-
-  fs.renameSync(
-    tempPath,
-    path.join(__dirname, "uploads", `${originalname}.part${index}`)
-  );
-
-  if (parseInt(index) === parseInt(totalChunks) - 1) {
-    // Last chunk, merge all chunks
-    const writeStream = fs.createWriteStream(targetPath);
-
-    for (let i = 0; i < totalChunks; i++) {
-      const chunkPath = path.join(
-        __dirname,
-        "uploads",
-        `${originalname}.part${i}`
-      );
-      const chunkBuffer = fs.readFileSync(chunkPath);
-      writeStream.write(chunkBuffer);
-      fs.rmSync(chunkPath);
+  return (paths, fileName, buffer) => {
+    if (!isExistDir && !fs.existsSync(paths)) {
+      fs.mkdirSync(paths, { recursive: true });
+      isExistDir = true;
     }
 
-    writeStream.end();
-    res.json({ message: "File uploaded successfully" });
-  } else {
-    // Rename chunk to include part number
-    res.json({ message: "Chunk uploaded successfully" });
-  }
+    fs.writeFileSync(path.join(paths, fileName), buffer);
+  };
+};
+
+const saveFile = _savaFile();
+
+app.post("/upload", upload.single("file"), (req, res) => {
+  const { index, totalChunks, hash } = req.body;
+
+  const tempPath = path.join(__dirname, `uploads`, hash);
+
+  // 保存到临时目录
+  saveFile(tempPath, `chunk.part${index}`, req.file.buffer);
+
+  res.json({ message: "Chunk uploaded successfully" });
+});
+
+app.post("/merge", (req, res) => {
+  const { fileName, hash, totalChunks } = req.body;
+
+  const tempPath = path.join(__dirname, "uploads", hash);
+  readdir(tempPath).then((files) => {
+    if (files.length !== totalChunks) {
+      res.json({ message: "文件流不完整" });
+      return;
+    } else {
+      const targetPath = path.join(__dirname, "uploads", `${hash}.${fileName}`);
+      const writeStream = fs.createWriteStream(targetPath);
+
+      for (let i = 0; i < totalChunks; i++) {
+        const chunkPath = path.join(tempPath, `chunk.part${i}`);
+        const chunkBuffer = fs.readFileSync(chunkPath);
+        writeStream.write(chunkBuffer);
+      }
+
+      // 移除临时文件
+      fs.rmdirSync(tempPath, { recursive: true });
+
+      writeStream.end();
+      res.json({ message: "File uploaded successfully" });
+    }
+  });
 });
 
 // 配置multer存储

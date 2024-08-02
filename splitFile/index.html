@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
+    <script src="https://cdn.bootcdn.net/ajax/libs/spark-md5/3.0.2/spark-md5.js"></script>
 </head>
 
 <body>
@@ -31,8 +32,14 @@
             if (options.type === 'GET') {
                 xhr.send();
             } else if (options.type === 'POST') {
-                // xhr.setRequestHeader('Content-Type', '');
-                xhr.send(options.data);
+
+                if (!(options.data instanceof FormData)) {
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+                    xhr.send(JSON.stringify(options.data));
+                } else {
+                    xhr.send(options.data);
+                }
+
             }
 
             // 处理响应
@@ -93,6 +100,11 @@
 
         // 处理切片
         function sliceFile(file) {
+
+            const spark = new SparkMD5.ArrayBuffer();
+            spark.append(file);
+            const md5 = spark.end() + `_${Date.now()}`;
+
             const chunkSize = 1024 * 1024 * 1; // 每个部分的大小（1MB）
             const totalChunks = Math.ceil(file.size / chunkSize); // 总部分数
 
@@ -109,6 +121,7 @@
                 formData.append('file', chunk, file.name);
                 formData.append('index', currentChunk - 1);
                 formData.append('totalChunks', totalChunks);
+                formData.append('hash', md5)
 
                 ajax({
                     url: 'http://localhost:3000/upload',
@@ -116,7 +129,18 @@
                     data: formData,
                     success: (res) => {
                         if (result++ === totalChunks) {
-                            console.log('文件已全部上传，用时: ', Date.now() - time)
+                            console.log('分片上传用时: ', Date.now() - time)
+                            ajax({
+                                url: 'http://localhost:3000/merge',
+                                type: 'POST',
+                                data: {
+                                    hash: md5,
+                                    totalChunks,
+                                    fileName: file.name
+                                },
+                                success: (res) => {
+                                }
+                            })
                         }
                     }
                 })
@@ -146,7 +170,7 @@
                     type: 'POST',
                     data: formData,
                     success: (res) => {
-                        console.log('用时: ', Date.now() - time)
+                        console.log('整体上传用时: ', Date.now() - time)
                     }
                 })
             })
