@@ -27,12 +27,15 @@ app.use((req, res, next) => {
 });
 
 const _savaFile = () => {
-  let isExistDir = false;
+  const map = {};
 
   return (paths, fileName, buffer) => {
-    if (!isExistDir && !fs.existsSync(paths)) {
+    map[paths] = false;
+
+    if (!map[paths] && !fs.existsSync(paths)) {
+      console.log("创建文件夹: ", paths);
       fs.mkdirSync(paths, { recursive: true });
-      isExistDir = true;
+      map[paths] = true;
     }
 
     fs.writeFileSync(path.join(paths, fileName), buffer);
@@ -42,7 +45,7 @@ const _savaFile = () => {
 const saveFile = _savaFile();
 
 app.post("/upload", upload.single("file"), (req, res) => {
-  const { index, totalChunks, hash } = req.body;
+  const { index, hash } = req.body;
 
   const tempPath = path.join(__dirname, `uploads`, hash);
 
@@ -71,7 +74,7 @@ app.post("/merge", (req, res) => {
       }
 
       // 移除临时文件
-      fs.rmdirSync(tempPath, { recursive: true });
+      fs.rm(tempPath, { recursive: true }, () => {});
 
       writeStream.end();
       res.json({ message: "File uploaded successfully" });
@@ -95,6 +98,6 @@ app.post("/uploadWithNotSplit", upload1.single("file"), (req, res) => {
   res.json({ message: "File uploaded successfully" });
 });
 
-app.listen(3000, () => {
+app.listen(3001, () => {
   console.log("Server is running on port 3000");
 });

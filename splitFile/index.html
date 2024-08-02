@@ -9,8 +9,8 @@
 </head>
 
 <body>
-    <div id="upload">分片上传</div>
-    <div id="upload1">整个上传</div>
+    <button id="upload">分片上传</button>
+    <button id="upload1">整个上传</button>
     <script>
 
         function ajax(options) {
@@ -98,25 +98,41 @@
         }
 
 
-        // 处理切片
-        function sliceFile(file) {
-
+        function computedMd5(file) {
             const spark = new SparkMD5.ArrayBuffer();
             spark.append(file);
             const md5 = spark.end() + `_${Date.now()}`;
+            return md5;
+        }
+        // 处理切片
+        function sliceFile(file) {
 
-            const chunkSize = 1024 * 1024 * 1; // 每个部分的大小（1MB）
-            const totalChunks = Math.ceil(file.size / chunkSize); // 总部分数
 
+            // 计算文件md5
+            const md5 = computedMd5(file)
+
+            // 每个部分的大小（1MB）
+            const chunkSize = 1024 * 1024 * 1;
+            // 总切片数, 这里需要向上取整
+            const totalChunks = Math.ceil(file.size / chunkSize);
+
+            // 当前切片
             let currentChunk = 1;
+            // 保存切片的起始位置
             let startByte = 0;
 
-            let result = 1, time = Date.now();
+            // 记录上传成功的切片数(用于判断是否上传完毕)
+            let result = 1
+            console.time('分片上传用时')
 
-            while (startByte < file.size) { // 分割文件为多个部分，并上传每个部分
+            // 分割文件为多个部分，并上传每个部分
+            while (startByte < file.size) {
+                // 计算切片的结束位置, 为了防止切片越界
                 const endByte = Math.min(startByte + chunkSize, file.size);
+                // 开始切片
                 const chunk = file.slice(startByte, endByte);
 
+                // 这里就是发送给后端的数据了.
                 const formData = new FormData();
                 formData.append('file', chunk, file.name);
                 formData.append('index', currentChunk - 1);
@@ -124,14 +140,14 @@
                 formData.append('hash', md5)
 
                 ajax({
-                    url: 'http://localhost:3000/upload',
+                    url: 'http://localhost:3001/upload',
                     type: 'POST',
                     data: formData,
                     success: (res) => {
                         if (result++ === totalChunks) {
-                            console.log('分片上传用时: ', Date.now() - time)
+
                             ajax({
-                                url: 'http://localhost:3000/merge',
+                                url: 'http://localhost:3001/merge',
                                 type: 'POST',
                                 data: {
                                     hash: md5,
@@ -139,6 +155,7 @@
                                     fileName: file.name
                                 },
                                 success: (res) => {
+                                    console.timeEnd('分片上传用时')
                                 }
                             })
                         }
@@ -159,18 +176,18 @@
 
         // 整个上传
         function handleToUploadWithNotSplit() {
-            const time = Date.now();
+            console.time('整体上传用时')
             chooseFile().then(([file]) => {
 
                 const formData = new FormData()
                 formData.append('file', file)
 
                 ajax({
-                    url: 'http://localhost:3000/uploadWithNotSplit',
+                    url: 'http://localhost:3001/uploadWithNotSplit',
                     type: 'POST',
                     data: formData,
                     success: (res) => {
-                        console.log('整体上传用时: ', Date.now() - time)
+                        console.timeEnd('整体上传用时')
                     }
                 })
             })
