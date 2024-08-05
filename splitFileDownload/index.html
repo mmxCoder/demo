@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+
+    <button id="download">下载文件(分片)</button>
+    <button id="downloadNot">下载文件(不分片)</button>
+
+    <script>
+
+        function ajax(options) {
+            // 默认值
+            options = options || {};
+            options.type = (options.type || 'GET').toUpperCase();
+            options.dataType = options.dataType || 'json';
+
+            // 创建xhr对象
+            var xhr = new XMLHttpRequest();
+
+            // 打开连接
+            xhr.open(options.type, options.url, true);
+
+            // 设置响应类型
+            xhr.responseType = options.dataType;
+
+
+            // debugger
+
+            xhr.setRequestHeader('Content-Type', 'application/json');
+
+            // 设置请求头
+            if (options.headers) {
+                for (var key in options.headers) {
+                    xhr.setRequestHeader(key, options.headers[key]);
+                }
+            }
+            xhr.send();
+
+            // 处理响应
+            xhr.onload = function () {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    options.success && options.success(xhr.response);
+                } else {
+                    options.error && options.error(xhr.statusText);
+                }
+            };
+
+            // 处理错误
+            xhr.onerror = function () {
+                options.error && options.error('Network Error');
+            };
+        }
+
+        // 下载文件
+        const saveAs = (name, buffers, mime = "application/octet-stream") => {
+            const blob = new Blob([buffers], { type: mime });
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.download = name
+            a.href = blobUrl;
+            a.click();
+            URL.revokeObjectURL(blob);
+        }
+
+
+        const fileName = 'testFile.txt'
+        download.addEventListener('click', () => {
+
+            console.time('分片下载')
+
+            ajax({
+                url: 'http://localhost:3001/getFileInfo?name=' + fileName,
+                success: (res) => {
+
+                    const size = res.data.size;
+
+                    // const size = 1024 * 1024 * 100
+
+                    // 每次获取 x M 的大小
+                    const chunk = 1024 * 1024 * 10;
+
+
+                    let start = 0, end = 0, index = 0, result = []
+                    while (end < size) {
+                        start = end
+                        end = Math.min(start + chunk, size)
+                        result.push([start, end])
+                    }
+
+                    Promise.all(result.map(item => {
+                        return new Promise((resolve, reject) => {
+                            ajax({
+                                url: `http://localhost:3001/getChunk?name=` + fileName,
+                                type: 'get',
+                                headers: {
+                                    Range: `bytes=${item[0]}-${item[1] - 1}`,
+                                },
+                                success: (res) => {
+                                    resolve(res)
+                                },
+                                error: (err) => {
+                                    reject(err)
+                                },
+                                dataType: 'blob'
+                            })
+                        })
+                    })).then(res => {
+                        const blob = new Blob(res)
+                        saveAs(fileName, blob)
+                        console.timeEnd('分片下载')
+                    })
+
+
+                }
+            })
+        })
+
+
+        downloadNot.addEventListener('click', () => {
+            console.time('整块下载')
+            ajax({
+                url: 'http://localhost:3001/getFile?name=' + fileName,
+                dataType: 'blob',
+                success(res) {
+                    saveAs(fileName, new Blob([res]))
+                    console.timeEnd('整块下载')
+                }
+            })
+        })
+
+    </script>
+</body>
+
+</html>
