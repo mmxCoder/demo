@@ -83,10 +83,10 @@
                     // const size = 1024 * 1024 * 100
 
                     // 每次获取 x M 的大小
-                    const chunk = 1024 * 1024 * 10;
+                    const chunk = 1024 * 1024 * 1;
 
 
-                    let start = 0, end = 0, index = 0, result = []
+                    let start = 0, end = 0, result = []
                     while (end < size) {
                         start = end
                         end = Math.min(start + chunk, size)
